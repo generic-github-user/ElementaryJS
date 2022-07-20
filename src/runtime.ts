@@ -2,11 +2,13 @@ import { EJSVERSION } from './version';
 import { TestResult } from './types';
 import * as stopify from '@stopify/stopify';
 
+// TODO: invert this flag (i.e., "ejsOn")?
 let ejsOff: boolean = false;
 export function disableEJS() { ejsOff = true; }
 
 export function version() { return EJSVERSION; }
 
+// Custom runtime error wrapper
 export class ElementaryRuntimeError extends Error {
   constructor(message: string) {
     super(message);
@@ -27,12 +29,14 @@ Please report this to the developers along with the following message:
   ${msg}`, 'elementaryJSBug');
 }
 
+// EJS array class that wraps the stopifyArray constructor (see below)
 class ArrayStub {
   constructor() {
     // TODO: Can this message actually be triggered?
     errorHandle(`Use 'Array.create(length, init)'.`, 'Array constructor');
   }
 
+  // Initialize an array of length `n` with each element set to `v`
   static create(n: any, v: any) {
     if (arguments.length !== 2) {
       errorHandle(`'.create' expects 2 arguments, received ${arguments.length}.`, 'Array.create');
@@ -48,8 +52,12 @@ class ArrayStub {
     return stopifyArray(a);
   }
 }
+// Replace built-in Array class
 export { ArrayStub as Array };
 
+// Make an array compatible with Stopify using runner.g.$stopifyArray(array),
+// which is defined in index.ts and provides an interface to the HOF polyfills
+// that Stopify uses
 export function stopifyArray(array: any[]) {
   const maybeRunner = getRunner();
   if (maybeRunner.kind === 'error') {
@@ -59,6 +67,7 @@ export function stopifyArray(array: any[]) {
   return maybeRunner.value.runner!.g.$stopifyArray(array);
 }
 
+// Recursively applies Stopify to objects and arrays (see above)
 export function stopifyObjectArrayRecur(obj: any) {
   if (typeof obj !== 'object') { // if not object, just return given
     return obj;
@@ -92,6 +101,7 @@ export function checkCall(object: any, field: string, args: any[]) {
   elementaryJSBug(`In 'checkCall' with ${field} on ${typeof object}.`);
 }
 
+// Check that operands for || and && are booleans
 export function checkIfBoolean(value: any, operator: '||' | '&&' | undefined, line: number) {
   if (typeof value !== 'boolean' && !operator) { // for the if statement
     errorHandle(`Expected a boolean expression, instead received '${value}'.`, 'checkIfBoolean',
@@ -103,6 +113,7 @@ export function checkIfBoolean(value: any, operator: '||' | '&&' | undefined, li
   return value;
 }
 
+// Check that array index is within bounds
 export function arrayBoundsCheck(object: any, index: string, line: number) {
   if (!Array.isArray(object)) {
     errorHandle('Array indexing called on a non-array value type.', 'arrayBoundsCheck', line);
@@ -116,6 +127,8 @@ export function arrayBoundsCheck(object: any, index: string, line: number) {
   return object && object[index];
 }
 
+// Check that `object` has an appropriate type for dot notation to be used to
+// access its properties
 export function dot(object: any, index: string, line: number) {
   if (typeof object !== 'object'  &&
       typeof object !== 'string'  &&
@@ -256,6 +269,7 @@ export function arityCheck(name: string, expected: number, actual: number, line:
 
 // ---------- TEST SUPPPORT ---------- //
 
+// ElementaryJS `test` wrapper
 export class ElementaryTestingError extends Error {
   constructor(message: string) {
     super(message);
@@ -352,6 +366,8 @@ export function test(description: string, testFunction: () => void) {
         });
       }, timeoutMilli);
       return runner.runStopifiedCode(testFunction, (result: any) => {
+        // This wraps Stopify so we don't need to manually catch exceptions
+        // (and setting a timeout becomes much easier)
         if (result.type === 'normal') {
           tests.push({
             failed: false,
@@ -404,6 +420,8 @@ export function summary(hasStyles: boolean) {
         style: string[] = [];
   let numPassed: number = 0,
       numFailed: number = 0;
+
+  // Generate output string (an array of lines)
   for (const result of tests) {
     if (result.failed) {
       output.push(`${styleMark} FAILED ${styleMark} ${result.description}\n         ${result.error!}`);
@@ -415,6 +433,7 @@ export function summary(hasStyles: boolean) {
     hasStyles && style.push('background-color: #2ac093; font-weight: bold', '');
     numPassed += 1;
   }
+
   if (numFailed > 0) {
     output.push(`Tests:     ${styleMark}${numFailed} failed, ${styleMark}${numPassed} passed, ${styleMark}${numPassed + numFailed} total.`);
     hasStyles && style.push('color: #f44336; font-weight: bold', 'color: #2ac093; font-weight: bold', 'font-weight: bold');
@@ -422,6 +441,7 @@ export function summary(hasStyles: boolean) {
     output.push(`Tests:     ${styleMark}${numPassed} passed, ${styleMark}${numPassed + numFailed} total.`);
     hasStyles && style.push('color: #2ac093; font-weight: bold', 'font-weight: bold');
   }
+
   enableTests(false);
   return {
     output: output.join('\n'),
