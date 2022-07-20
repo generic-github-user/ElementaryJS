@@ -27,6 +27,7 @@ const hostname = theGlobal.location?.hostname;
 theGlobal.elementaryJS = runtime;
 theGlobal.stopify = stopify;
 
+// A class that wraps Stopify and Babel to provide ElementaryJS' functionality
 class ElementaryRunner implements CompileOK {
   public g: { [key: string]: any };
   public kind: 'ok' = 'ok';
@@ -34,6 +35,7 @@ class ElementaryRunner implements CompileOK {
   private ejsOff: boolean;
 
   constructor(private runner: stopify.AsyncRun & stopify.AsyncEval, opts: CompilerOpts) {
+    // A boolean flag indicating whether EJS should be used in the evaluation
     this.ejsOff = opts.ejsOff as boolean;
     if (this.ejsOff) { runtime.disableEJS(); }
 
@@ -68,13 +70,17 @@ class ElementaryRunner implements CompileOK {
       lib220: Object.freeze(this.codeMap.lib220),
       ocelot: Object.freeze(this.codeMap.lib220),
       version: opts.version,
+      // See runtime.ts and the Stopify source for the details on the Array HOF polyfills
       Array: runtime.Array,
+      // Other constants and objects that the runtime should inherit
       Math: Math,
       undefined: undefined,
       Infinity: Number.POSITIVE_INFINITY,
       Object: Object, // Needed for classes
       parseInt: Number.parseInt,
       parseFloat: Number.parseFloat,
+      // Global functions from lib220; see also
+      // https://github.com/ocelot-ide/ElementaryJS/issues/156
       hire: this.codeMap.oracle.hire,
       wheat1: this.codeMap.oracle.wheat1,
       chaff1: this.codeMap.oracle.chaff1,
@@ -168,6 +174,9 @@ class ElementaryRunner implements CompileOK {
   }
 }
 
+// Transforms the `code` string into an ElementaryJS-compatible AST without
+// evaluating it (I'm 85% sure this is the purpose, but if one of the original
+// authors comes across this comment please feel free to revise)
 function applyElementaryJS(code: string | Node, ejsOff: boolean):
   CompileError | { kind: 'ok', ast: Program } {
   try {
@@ -182,6 +191,8 @@ function applyElementaryJS(code: string | Node, ejsOff: boolean):
           }),
           // NOTE(arjun): There is some imprecision in the type produced by Babel.
           // I have verified that this cast is safe.
+          // Prepare the polyfilled program AST to return (see
+          // https://babeljs.io/docs/en/babel-types#file)
           polyfilled = polyfillHofFromAst((result2.ast as babel.types.File).program);
 
     return {
@@ -206,6 +217,9 @@ function applyElementaryJS(code: string | Node, ejsOff: boolean):
         message = groups[1];
       }
     } else if (exn.loc && exn.loc.line) { // This can happen due to Babel.
+      // TODO: there are known issues which can make Ocelot display incorrect
+      // line numbers for certain types of errors; the error handling in this
+      // function might be relevant
       line = Number(exn.loc.line);
       message = exn.message;
     } else {
